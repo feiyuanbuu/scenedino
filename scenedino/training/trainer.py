@@ -42,6 +42,39 @@ from scenedino.common import util
 logger = logging.getLogger("training")
 
 
+def _make_optimizer_param_groups(model: nn.Module, config: dict):
+    model_unwrapped = util.get_module(model)
+    encoder = model_unwrapped.renderer.net.encoder
+    base_optim_args = config["training"]["optimizer"]["args"]
+
+    special_modules = []
+    if hasattr(encoder, "decoder"):
+        special_modules.append(("renderer.net.encoder.decoder.", encoder.decoder, base_optim_args.copy()))
+    if hasattr(encoder, "encoder"):
+        encoder_optim_args = base_optim_args.copy()
+        encoder_optim_args["lr"] = encoder_optim_args["lr"] / 10
+        special_modules.append(("renderer.net.encoder.encoder.", encoder.encoder, encoder_optim_args))
+
+    special_prefixes = tuple(prefix for prefix, _, _ in special_modules)
+    param_groups = [
+        {
+            "params": (
+                p
+                for n, p in model_unwrapped.named_parameters()
+                if p.requires_grad and not n.startswith(special_prefixes)
+            ),
+            **base_optim_args,
+        }
+    ]
+
+    for _, module, optim_args in special_modules:
+        params = [p for p in module.parameters() if p.requires_grad]
+        if params:
+            param_groups.append({"params": params, **optim_args})
+
+    return param_groups
+
+
 class BTSWrapper(nn.Module):
     def __init__(
         self, renderer: NeRFRenderer, ray_sampler: RaySampler, config, eval_nvs=False, dino_channels=None
@@ -106,9 +139,10 @@ class BTSWrapper(nn.Module):
 
         self.compensate_artifacts = config.get("compensate_artifacts", True)
         if self.compensate_artifacts:
-            patch_size = renderer.net.encoder.gt_encoder.patch_size
-            image_size = renderer.net.encoder.gt_encoder.image_size
-            latent_size = renderer.net.encoder.gt_encoder.latent_size
+            gt_encoder = getattr(renderer.net.encoder, "gt_encoder", renderer.net.encoder)
+            patch_size = gt_encoder.patch_size
+            image_size = gt_encoder.image_size
+            latent_size = gt_encoder.latent_size
 
             self.artifact_field = nn.Parameter(torch.zeros(latent_size, image_size[0]//patch_size, image_size[1]//patch_size))
             nn.init.normal_(self.artifact_field, mean=0.0, std=0.001)
@@ -183,7 +217,11 @@ class BTSWrapper(nn.Module):
             self.renderer.net.compute_grid_transforms(
                 projs[:, ids_encoder], poses[:, ids_encoder]
             )
-            shift = self.renderer.net.encoder.encoder.patch_size // 2
+            encoder = self.renderer.net.encoder
+            patch_size = getattr(encoder, "patch_size", None)
+            if patch_size is None:
+                patch_size = encoder.encoder.patch_size
+            shift = patch_size // 2
             loss_feature_grid_shift = torch.randint(-shift, shift, (2,)) if self.training else None
             self.renderer.net.encode(
                 images,
@@ -280,7 +318,7 @@ class BTSWrapper(nn.Module):
             data["rays"] = render_dict["rays"]
 
             dino_module = self.renderer.net.encoder
-            if isinstance(dino_module.dim_reduction, OrthogonalLinearDimReduction):
+            if isinstance(getattr(dino_module, "dim_reduction", None), OrthogonalLinearDimReduction):
                 data["reduction_matrix"] = dino_module.dim_reduction.weights
 
             downsampling_mode = "patch" if self.training else "image"
@@ -515,14 +553,17 @@ def get_dataflow(config):
             shuffle=False,
         )
 
-    if idist.get_local_rank() == 0:
-        # Ensure that only local rank 0 download the dataset
-        idist.barrier()
+    # Release ranks that waited before dataset initialization.
+    idist.barrier()
 
     return train_loader, validation_loaders
 
 
 def initialize(config: dict):
+    torch.manual_seed(config["seed"])
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(config["seed"])
+
     # Continue if checkpoint already exists
     if config["training"].get("continue", False):
         prefix = "training_checkpoint_"
@@ -553,25 +594,14 @@ def initialize(config: dict):
 
     model = BTSWrapper(renderer, ray_sampler, config["model"], mode == "nvs")
 
-    model = idist.auto_model(model)
-
-    dino_decoder_optim_args = config["training"]["optimizer"]["args"].copy()
-    dino_decoder_optim_args["lr"] = dino_decoder_optim_args["lr"]
-
-    dino_encoder_optim_args = config["training"]["optimizer"]["args"].copy()
-    dino_encoder_optim_args["lr"] = dino_encoder_optim_args["lr"] / 10  # for fine-tuning
+    if config["training"].get("auto_model", True):
+        auto_model_kwargs = config["training"].get("auto_model_kwargs", {})
+        model = idist.auto_model(model, **auto_model_kwargs)
+    else:
+        model = model.to(idist.device())
 
     # TODO: make optimizer itself configurable configurable
-    optimizer = optim.Adam(
-        [
-            {"params": (p for n, p in model.named_parameters() if not (n.startswith('renderer.net.encoder.encoder.') or n.startswith('renderer.net.encoder.decoder.'))), 
-             **config["training"]["optimizer"]["args"]},
-            {"params": model.renderer.net.encoder.decoder.parameters(), 
-             **dino_decoder_optim_args},
-            {"params": model.renderer.net.encoder.encoder.parameters(), 
-             **dino_encoder_optim_args},
-        ]
-    )
+    optimizer = optim.Adam(_make_optimizer_param_groups(model, config))
     optimizer = idist.auto_optim(optimizer)
 
     lr_scheduler = make_scheduler(config["training"].get("scheduler", {}), optimizer)

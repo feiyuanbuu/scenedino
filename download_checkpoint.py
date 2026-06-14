@@ -3,6 +3,7 @@ import sys
 import argparse
 from huggingface_hub import hf_hub_download
 from pathlib import Path
+# os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
 
 def download_scenedino_checkpoint(model_name):
     print("----------------------- Downloading pretrained model -----------------------")

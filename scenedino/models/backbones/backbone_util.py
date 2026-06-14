@@ -2,6 +2,7 @@ from .image_encoder import ImageEncoder
 from .monodepth2 import Monodepth2
 from .spatial_encoder import SpatialEncoder
 from scenedino.models.backbones.dino.dinov2_module import DINOv2Module
+from scenedino.models.backbones.vggt_omega_adapter import VGGTOmegaSceneDINOAdapter
 
 
 def make_backbone(conf, **kwargs):
@@ -14,6 +15,8 @@ def make_backbone(conf, **kwargs):
         net = ImageEncoder.from_conf(conf, **kwargs)
     elif enc_type == "dinov2":
         net = DINOv2Module.from_conf(conf, **kwargs)
+    elif enc_type == "vggt_omega":
+        net = VGGTOmegaSceneDINOAdapter.from_conf(conf, **kwargs)
     else:
         raise NotImplementedError(f"Unsupported encoder type: {enc_type}")
     return net

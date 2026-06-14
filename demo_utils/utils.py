@@ -21,8 +21,9 @@ device = "cuda"
 
 def load_modules(
     ckpt_path: str, 
-    ckpt_name: str
-) -> tuple[BTSNet, NeRFRenderer, ImageRaySampler, Dataset]:
+    ckpt_name: str,
+    load_dataset: bool = True,
+) -> tuple[BTSNet, NeRFRenderer, ImageRaySampler, Dataset | None]:
     """
     Loads relevant modules with a SceneDINO checkpoint (*.pt) and corresponding config (training_config.yaml) file.
 
@@ -55,7 +56,7 @@ def load_modules(
     model.load_state_dict(cp, strict=False)
     model = model.to(device)
 
-    test_dataset = make_datasets(config["dataset"])[1]
+    test_dataset = make_datasets(config["dataset"])[1] if load_dataset else None
 
     return net, renderer, ray_sampler, test_dataset
 

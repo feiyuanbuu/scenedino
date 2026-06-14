@@ -1,0 +1,72 @@
+arch: "BTSNet"
+use_code: true
+prediction_mode: default
+
+predict_dino: true
+dino_dims: 256
+
+compensate_artifacts: false
+flip_augmentation: false
+
+encoder:
+  type: "vggt_omega"
+  checkpoint_path: "/home/wy/.cache/modelscope/hub/models/facebook/VGGT-Omega/vggt_omega_1b_512.pt"
+  load_checkpoint: true
+  freeze_vggt: true
+  patch_size: 16
+  embed_dim: 1024
+  adapter_dim: 256
+  dino_pca_dim: 256
+  image_size: [192, 640]
+  use_patch_tokens: true
+  use_register_tokens: true
+  use_depth: true
+  use_depth_conf: true
+  enable_camera_head: true
+  checkpoint_strict: true
+  lora:
+    enabled: true
+    rank: 8
+    alpha: 16
+    dropout: 0.0
+    target_modules: ["aggregator", "dense_head"]
+    checkpoint: null
+    checkpoint_strict: false
+  downsampler_arch: "featup"
+  normalize_features: true
+
+code:
+  num_freqs: 6
+  freq_factor: 1.5
+  include_input: true
+
+decoder_heads:
+  - type: "resnet"
+    name: "normal_head"
+    freeze: false
+    args:
+      n_blocks: 0
+      d_hidden: 128
+final_prediction_head: "normal_head"
+
+encoding_strategy:
+  name: "default"
+  args: {}
+eval_encoding_strategy:
+  name: "default"
+  args: null
+loss_renderer_strategy:
+  name: "kitti_360"
+  args: null
+eval_loss_renderer_strategy:
+  name: "single_renderer"
+  args:
+    shuffle_frames: false
+    all_frames: true
+
+inv_z: true
+
+learn_empty: false
+code_mode: z
+
+n_frames_render: 4

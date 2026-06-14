@@ -1,6 +1,6 @@
 type: "old_KITTI_360"
-data_path: "<PATH-KITTI-360>"
-pose_path: "<PATH-KITTI-360-DATA-POSES>"
+data_path: "/mnt/sdc/wy/KITTI-360"
+pose_path: "/mnt/sdc/wy/KITTI-360/data_poses"
 split_path: "datasets/kitti_360/splits/sscbench"
 image_size: [ 192, 640 ]
 data_stereo: true

@@ -16,13 +16,16 @@ def main():
     
     # Load model, ray sampler, datasets
     ckpt_name = "checkpoint.pt"
-    net, renderer, ray_sampler, test_dataset = load_modules(args.ckpt, ckpt_name)
+    net, renderer, ray_sampler, test_dataset = load_modules(
+        args.ckpt, ckpt_name, load_dataset=args.image is None
+    )
 
     if args.image:
         # Load image from path
         images, poses, projs = load_sample_from_path(args.image, intrinsic=None)
     else:
         # Load image from test dataset
+        assert test_dataset is not None
         images, poses, projs = load_sample_from_dataset(0, test_dataset)
 
     # Encode input image
@@ -80,3 +83,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# CUDA_VISIBLE_DEVICES=1 python demo_script.py --ckpt out/scenedino-pretrained/seg-best-dino/ --image demo_utils/examples/kitti-360-1.png

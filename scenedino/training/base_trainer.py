@@ -34,6 +34,60 @@ from scenedino.visualization.vis_2d import tb_visualize
 import optuna
 
 
+def _unwrap_model(model):
+    return (
+        model.module
+        if isinstance(
+            model,
+            (
+                torch.nn.DataParallel,
+                torch.nn.parallel.DistributedDataParallel,
+            ),
+        )
+        else model
+    )
+
+
+def _named_parameters_all(model):
+    model = _unwrap_model(model)
+    return torch.nn.Module.named_parameters(
+        model,
+        recurse=True,
+        remove_duplicate=True,
+    )
+
+
+def _get_vggt_lora_encoder(model):
+    model = _unwrap_model(model)
+    if not hasattr(model, "renderer"):
+        return None
+    encoder = getattr(model.renderer.net, "encoder", None)
+    if encoder is not None and hasattr(encoder, "lora_state_dict"):
+        return encoder
+    return None
+
+
+def _save_vggt_lora_adapter(model, output_path: Path, step: int | str, logger=None):
+    encoder = _get_vggt_lora_encoder(model)
+    if encoder is None or not getattr(encoder, "lora_enabled", False):
+        return
+
+    state_dict = encoder.lora_state_dict()
+    if not state_dict:
+        return
+
+    path = output_path / f"vggt_omega_lora_adapter_{step}.pt"
+    torch.save(
+        {
+            "lora_state_dict": state_dict,
+            "target_modules": getattr(encoder, "lora_target_modules", []),
+        },
+        path,
+    )
+    if logger is not None:
+        logger.info(f"Saved VGGT-Omega LoRA adapter: {path}")
+
+
 def base_training(local_rank, config, get_dataflow, initialize, sweep_trial=None):
     # ============================================ LOGGING AND OUTPUT SETUP ============================================
     # TODO: figure out rank
@@ -48,19 +102,17 @@ def base_training(local_rank, config, get_dataflow, initialize, sweep_trial=None
         name=model_name, format="%(levelname)s: %(message)s"
     )  ## default
 
-    output_path = config["output"]["path"]
+    unique_id = config["output"].get(
+        "unique_id", datetime.now().strftime("%Y%m%d-%H%M%S")
+    )
+    output_path = Path(config["output"]["path"]) / unique_id
+    config["output"]["path"] = output_path.as_posix()
     if rank == 0:
-        unique_id = config["output"].get(
-            "unique_id", datetime.now().strftime("%Y%m%d-%H%M%S")
-        )
-        folder_name = unique_id
         # folder_name = f"{model_name}_backend-{idist.backend()}-{idist.get_world_size()}_{unique_id}"
 
-        output_path = Path(output_path) / folder_name
         if not output_path.exists():
             output_path.mkdir(parents=True)
 
-        config["output"]["path"] = output_path.as_posix()
         logger.info(f"Output path: {config['output']['path']}")
 
         if "cuda" in device.type:
@@ -90,8 +142,8 @@ def base_training(local_rank, config, get_dataflow, initialize, sweep_trial=None
 
     # ============================================= MODEL AND OPTIMIZATION =============================================
     model, optimizer, criterion, lr_scheduler = initialize(config)
-    logger.info(f"Model parameters: {sum(p.numel() for p in model.parameters())}")
-    logger.info(f"Trainable model parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad)}")
+    logger.info(f"Model parameters: {sum(p.numel() for _, p in _named_parameters_all(model))}")
+    logger.info(f"Trainable model parameters: {sum(p.numel() for _, p in _named_parameters_all(model) if p.requires_grad)}")
 
     # Create trainer for current task
     trainer = create_trainer(
@@ -292,6 +344,15 @@ def create_trainer(
         n_saved=1,
     )
 
+    if idist.get_rank() == 0:
+        @trainer.on(Events.ITERATION_COMPLETED(every=config["training"]["checkpoint_every"]))
+        def _save_lora_adapter(engine):
+            _save_vggt_lora_adapter(model, Path(config["output"]["path"]), engine.state.iteration, logger)
+
+        @trainer.on(Events.COMPLETED)
+        def _save_final_lora_adapter(engine):
+            _save_vggt_lora_adapter(model, Path(config["output"]["path"]), "final", logger)
+
     # NOTE: don't move to initialization, as to save is also needed here
     if config["training"].get("resume_from", None):
         ckpt_path = Path(config["training"]["resume_from"])
@@ -407,22 +468,23 @@ def create_validators(
 
         # ADD LOGGING HANDLER
         # TODO: split up handlers
-        tb_logger.attach(
-            validator,
-            MetricLoggingHandler(
-                tag,
-                log_loss=False,
-                global_step_transform=global_step_fn(
-                    trainer, validation_config["global_step"]
+        if idist.get_rank() == 0:
+            tb_logger.attach(
+                validator,
+                MetricLoggingHandler(
+                    tag,
+                    log_loss=False,
+                    global_step_transform=global_step_fn(
+                        trainer, validation_config["global_step"]
+                    ),
                 ),
-            ),
-            Events.EPOCH_COMPLETED,
-        )
+                Events.EPOCH_COMPLETED,
+            )
 
         # ADD VISUALIZATION HANDLER
-        if validation_config.get("visualize", None):
+        if idist.get_rank() == 0 and validation_config.get("visualize", None):
             visualize = tb_visualize(
-                (model.renderer.net if hasattr(model, "renderer") else model.module.renderer.net),
+                _unwrap_model(model).renderer.net,
                 dataloaders[tag].dataset.dataset,
                 validation_config["visualize"],
             )

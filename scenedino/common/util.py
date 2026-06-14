@@ -539,9 +539,15 @@ def rot_to_quat(R):
 
 def get_module(net):
     """
-    Shorthand for either net.module (if net is instance of DataParallel) or net
+    Shorthand for either net.module (if net is instance of DataParallel/DDP) or net
     """
-    if isinstance(net, torch.nn.DataParallel):
+    if isinstance(
+        net,
+        (
+            torch.nn.DataParallel,
+            torch.nn.parallel.DistributedDataParallel,
+        ),
+    ):
         return net.module
     else:
         return net

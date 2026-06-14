@@ -16,7 +16,8 @@ from scenedino.common.positional_encoding import encoding_mode
 from scenedino.models.base_model import BaseModel
 
 
-torch.inverse(torch.ones((1, 1), device="cuda:0"))
+if torch.cuda.is_available():
+    torch.inverse(torch.ones((1, 1), device="cuda:0"))
 
 
 class BTSNet(BaseModel):
@@ -191,7 +192,10 @@ class BTSNet(BaseModel):
             images_encoder = torch.flip(images_encoder, dims=(-1,))
             # images_loss = torch.flip(images_loss, dims=(-1,))
 
-        image_latents_ms = self.encoder(images_encoder.view(n_ * nv_, c_, h_, w_))
+        if getattr(self.encoder, "multiview_input", False):
+            image_latents_ms = self.encoder(images_encoder)
+        else:
+            image_latents_ms = self.encoder(images_encoder.view(n_ * nv_, c_, h_, w_))
 
         # TODO: figure out patch shift
         if loss_feature_grid_shift is not None and loss_feature_grid_shift != (0, 0):
@@ -204,8 +208,11 @@ class BTSNet(BaseModel):
             images_loss = transforms.functional.crop(images_loss, i_shift, j_shift, h_, w_)
             images_loss = images_loss.unflatten(0, (n, v))
 
-        image_loss_latents_ms = self.encoder(images_loss.view(n_loss_ * nv_loss_, c_, h_, w_),
-                                             ground_truth=True)
+        if getattr(self.encoder, "multiview_input", False):
+            image_loss_latents_ms = self.encoder(images_loss, ground_truth=True)
+        else:
+            image_loss_latents_ms = self.encoder(images_loss.view(n_loss_ * nv_loss_, c_, h_, w_),
+                                                 ground_truth=True)
 
         if do_flip:
             image_latents_ms = [torch.flip(il, dims=(-1,)) for il in image_latents_ms]

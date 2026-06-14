@@ -9,6 +9,7 @@ from ignite.utils import manual_seed, setup_logger
 from torch.cuda.amp import autocast
 from scenedino.common.logging import log_basic_info
 
+from scenedino.common import util
 from scenedino.common.array_operations import to
 
 # from ignite.contrib.handlers.tensorboard_logger import *
@@ -187,7 +188,7 @@ def create_evaluator(model, config, logger=None, vis_logger=None, tag="val"):
         for name, vis_config in config["validation"].items():
             if "visualize" in vis_config:
                 visualize = tb_visualize(
-                    (model.renderer.net if hasattr(model, "renderer") else model.module.renderer.net),
+                    util.get_module(model).renderer.net,
                     None,
                     vis_config["visualize"],
                 )
