@@ -264,8 +264,14 @@ class MeanMetric(Metric):
 
     @reinit__is_reduced
     def update(self, value):
-        if torch.any(torch.isnan(torch.tensor(value))):
+        if isinstance(value, torch.Tensor):
+            value = value.detach().to(device=self._device, dtype=torch.float32)
+        else:
+            value = torch.as_tensor(value, device=self._device, dtype=torch.float32)
+
+        if torch.any(torch.isnan(value)):
             raise ValueError("NaN values present in metric!")
+        value = value.mean()
         self._sum += value
         self._num_examples += 1
 

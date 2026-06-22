@@ -14,18 +14,12 @@ from scenedino.training.trainer_downstream import training as downstream_trainin
 def main(config: DictConfig):
     OmegaConf.set_struct(config, False)
 
-    os.environ.setdefault("NCCL_DEBUG", "INFO")
-    # Single-node DDP does not need IB/RoCE. Some machines expose irdma/RoCE
-    # devices that can crash NCCL during bootstrap, so default to the safer
-    # socket path unless the user explicitly overrides it.
-    os.environ.setdefault("NCCL_IB_DISABLE", "1")
-    os.environ.setdefault("NCCL_P2P_DISABLE", "0")
-    os.environ.setdefault("NCCL_SOCKET_IFNAME", "lo")
+    os.environ["NCCL_DEBUG"] = "INFO"
     # os.environ["CUDA_VISIBLE_DEVICES"] = "0"
     # os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
     torch.autograd.set_detect_anomaly(False)
 
-    ## Set up for training with multi-GPUs
+    ## Set up Ignite launcher
     backend = config.get("backend", None)
     nproc_per_node = config.get("nproc_per_node", None)
     with_amp = config.get("with_amp", False)
@@ -49,12 +43,7 @@ if __name__ == "__main__":
     main()
 # CUDA_VISIBLE_DEVICES=1 python train.py -cn train_scenedino_kitti_360 dataset.is_preprocessed=false
 
-# Single-GPU VGGT-Omega adapter training. The config defaults to backend=null,
-# so Ignite will not open a distributed rendezvous port.
-# CUDA_VISIBLE_DEVICES=1 python train.py -cn train_scenedino_vggt_omega_kitti_360 dataset.is_preprocessed=false
-#
-# Multi-GPU VGGT-Omega adapter training:
-# CUDA_VISIBLE_DEVICES=1,2 python train.py -cn train_scenedino_vggt_omega_kitti_360 backend=nccl nproc_per_node=2 dataset.is_preprocessed=false
+# CUDA_VISIBLE_DEVICES=1  python train.py -cn train_scenedino_vggt_omega_kitti_360 dataset.is_preprocessed=false
 
 
 # /home/wy/code/scenedino_1/out/scenedino-pretrained/seg-best-dino
@@ -63,3 +52,52 @@ if __name__ == "__main__":
 #   dataset.is_preprocessed=false \
 #   training.from_pretrained=out/scenedino-pretrained/seg-best-dino/checkpoint.pt\
 #   training.num_epochs=10
+
+# 6_20
+# CUDA_VISIBLE_DEVICES=1 python train.py \
+#   -cn train_scenedino_vggt_omega_kitti_360 \
+#   dataset.is_preprocessed=false \
+#   training.from_pretrained=out/scenedino-pretrained/seg-best-dino/checkpoint.pt\
+#   training.num_epochs=5
+
+
+# 6_21
+# CUDA_VISIBLE_DEVICES=1 python train.py \
+#   -cn train_scenedino_vggt_omega_kitti_360 \
+#   dataset.is_preprocessed=false \
+#   training.from_pretrained=out/scenedino-pretrained/seg-best-dino/checkpoint.pt\
+#   training.num_epochs=1
+
+
+
+
+# CUDA_VISIBLE_DEVICES=1 python train.py \
+#   -cn train_scenedino_vggt_omega_kitti_360 \
+#   dataset.is_preprocessed=false \
+#   training.from_pretrained=out/scenedino-pretrained/seg-best-dino/checkpoint.pt\
+#   training.num_epochs=2\
+#   training.epoch_length=10000
+
+
+
+
+
+
+
+
+
+
+# semantic
+
+# CUDA_VISIBLE_DEVICES=1 python train.py \
+#   -cn train_semantic_vggt_omega_kitti_360 \
+#   dataset.is_preprocessed=false
+
+
+# CUDA_VISIBLE_DEVICES=1 python train.py -cn train_semantic_kitti_360 dataset.is_preprocessed=false 
+
+# 6_22
+# CUDA_VISIBLE_DEVICES=1 python train.py \
+#   -cn train_semantic_vggt_omega_kitti_360 \
+#   dataset.is_preprocessed=false
+

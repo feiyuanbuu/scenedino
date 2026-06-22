@@ -62,7 +62,7 @@ visualization:
     rendered_flow: null
     predicted_occlusions: null
     uncertainty: null
-  log_loss: false
+  log_loss: true
   global_step:
     type: "trainer iteration"
   events:

@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+import re
 import torch
 from torch import nn
 from torch.utils.data import DataLoader, Subset
@@ -18,6 +19,64 @@ from scenedino.training.trainer_downstream import BTSDownstreamWrapper
 IDX = 0
 
 logger = logging.getLogger("evaluation")
+
+
+def _infer_vggt_lora_checkpoint(checkpoint_path: Path) -> Path | None:
+    match = re.match(r"training_checkpoint_(\d+)$", checkpoint_path.stem)
+    if not match:
+        return None
+
+    candidate = checkpoint_path.with_name(f"vggt_omega_lora_adapter_{match.group(1)}.pt")
+    return candidate if candidate.exists() else None
+
+
+def _resolve_vggt_lora_checkpoint(lora_checkpoint: str | Path, checkpoint_path: Path) -> Path:
+    lora_checkpoint = Path(lora_checkpoint)
+    if lora_checkpoint.is_absolute() or lora_checkpoint.exists():
+        return lora_checkpoint
+
+    checkpoint_sibling = checkpoint_path.parent / lora_checkpoint
+    if checkpoint_sibling.exists():
+        return checkpoint_sibling
+
+    return lora_checkpoint
+
+
+def _configure_vggt_omega_evaluation(config: dict, checkpoint_path: Path):
+    model_config = config.get("model", {})
+    encoder_config = model_config.get("encoder", {})
+    if encoder_config.get("type", None) != "vggt_omega":
+        return
+
+    lora_config = encoder_config.get("lora", None)
+    if lora_config and lora_config.get("enabled", False):
+        lora_checkpoint = config.get("vggt_lora_checkpoint", None)
+        lora_source = None
+        if lora_checkpoint:
+            lora_checkpoint = _resolve_vggt_lora_checkpoint(lora_checkpoint, checkpoint_path)
+            lora_source = "explicit"
+        elif not lora_config.get("checkpoint", None):
+            lora_checkpoint = _infer_vggt_lora_checkpoint(checkpoint_path)
+            lora_source = "inferred" if lora_checkpoint is not None else None
+
+        if lora_checkpoint is not None:
+            if lora_checkpoint.exists():
+                lora_config["checkpoint"] = lora_checkpoint.as_posix()
+                lora_config["checkpoint_strict"] = lora_config.get("checkpoint_strict", False)
+                config["vggt_lora_checkpoint"] = lora_checkpoint.as_posix()
+                config["_vggt_lora_checkpoint_source"] = lora_source
+                logger.info(f"Loading VGGT-Omega LoRA adapter from: {lora_checkpoint}")
+            else:
+                logger.warning(f"VGGT-Omega LoRA adapter checkpoint not found: {lora_checkpoint}")
+
+    if config.get("auto_downstream_input_dim", True) and config.get("downstream", None):
+        input_dim = model_config.get("dino_dims", encoder_config.get("dino_pca_dim", None))
+        if input_dim is not None and config["downstream"].get("input_dim", None) != input_dim:
+            logger.info(
+                "Setting downstream.input_dim from "
+                f"{config['downstream'].get('input_dim', None)} to {input_dim} for VGGT-Omega evaluation"
+            )
+            config["downstream"]["input_dim"] = input_dim
 
 
 class BTSWrapper(nn.Module):
@@ -128,6 +187,7 @@ def initialize(config: dict):
     checkpoint = Path(config["checkpoint"])
     logger.info(f"Loading model config from {checkpoint.parent}")
     load_model_config(checkpoint.parent, config)
+    _configure_vggt_omega_evaluation(config, checkpoint)
 
     net = make_model(config["model"], config["downstream"])
     # net = make_model(config["model"])

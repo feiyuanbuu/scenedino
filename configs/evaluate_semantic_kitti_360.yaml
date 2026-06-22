@@ -31,13 +31,15 @@ renderer:
   eval_batch_size: 65536
   normalize_dino: true
 
-# eval_visualize: [0, 1, 2, 3]
+eval_visualize: [0, 1, 2, 3]
 
 output:
   path: "out/evaluation-paper"
-  unique_id: evaluation-kitti-360-sscbench
+  unique_id: evaluation-kitti-360-sscbench-vggt-omega-lora-exp-002-test_6_22
 
 checkpoint: "<PATH-FEATURE-CHECKPOINT>.pt"
+vggt_lora_checkpoint: null
+auto_downstream_input_dim: true
 
 evaluations:
   - type: seg

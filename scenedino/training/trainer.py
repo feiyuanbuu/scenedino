@@ -10,8 +10,6 @@ from torch.nn import functional as F
 from torch.utils.data import Subset
 from torch import profiler
 
-import lpips
-
 from scenedino.datasets import make_datasets
 from scenedino.losses import make_loss
 from scenedino.common.image_processor import make_image_processor, RGBProcessor
@@ -132,8 +130,7 @@ class BTSWrapper(nn.Module):
             assert self.renderer.net.uncertainty_predictor is not None
 
         self.eval_nvs = eval_nvs
-        if self.eval_nvs:
-            self.lpips = lpips.LPIPS(net="alex")
+        self.lpips = None
 
         self._counter = 0
 
@@ -595,8 +592,7 @@ def initialize(config: dict):
     model = BTSWrapper(renderer, ray_sampler, config["model"], mode == "nvs")
 
     if config["training"].get("auto_model", True):
-        auto_model_kwargs = config["training"].get("auto_model_kwargs", {})
-        model = idist.auto_model(model, **auto_model_kwargs)
+        model = idist.auto_model(model)
     else:
         model = model.to(idist.device())
 

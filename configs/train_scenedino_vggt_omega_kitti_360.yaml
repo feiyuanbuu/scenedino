@@ -18,7 +18,7 @@ num_workers: 4
 
 output:
   path: "out/features-paper"
-  unique_id: scenedino-vggt-omega-kitti-360-sscbench-lora-exp-001
+  unique_id: scenedino-vggt-omega-kitti-360-sscbench-lora-exp-002-test-3
 
 renderer:
   n_coarse : 32
@@ -35,10 +35,6 @@ renderer:
 
 training:
   auto_model: true
-  auto_model_kwargs:
-    find_unused_parameters: true
-    init_sync: false
-    bucket_cap_mb: 128
 
   # Optional: load a SceneDINO checkpoint and continue normal training with the
   # VGGT-Omega LoRA adapter enabled.

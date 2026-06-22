@@ -5,9 +5,10 @@ defaults:
   - _self_
 
 num_epochs: 50
+epoch_length: 10000
 continue: false
 
-checkpoint_every: 10000
+checkpoint_every: 2000
 log_every_iters: 100
 
 ray_sampler:

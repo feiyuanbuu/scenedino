@@ -119,9 +119,11 @@ class SemanticHead(nn.Module):
         else:
             raise NotImplementedError(f"Mode '{mode}' is not known!")
 
-    def forward_training(self, data, visualize=False, sample_factor=4):  # TODO: visualization
+    def forward_training(self, data, visualize=False, sample_factor=4, detach_features=True):  # TODO: visualization
         rgb_image = data["coarse"][0]["rgb"].detach()
-        dino_features = data["coarse"][0]["dino_features"].detach()  # [n, v, h, w, 1, c]
+        dino_features = data["coarse"][0]["dino_features"]  # [n, v, h, w, 1, c]
+        if detach_features:
+            dino_features = dino_features.detach()
         dino_features = _norm(dino_features)
 
         n, v, h, w, _, c = dino_features.shape
@@ -135,7 +137,9 @@ class SemanticHead(nn.Module):
         data["segmentation"] = {}
         if data["sample_surface_sigma"] is not None:
             if self.mode == "3d":
-                cropped_dino_features = data["sample_surface_dino_features"].detach().squeeze(0)
+                cropped_dino_features = data["sample_surface_dino_features"].squeeze(0)
+                if detach_features:
+                    cropped_dino_features = cropped_dino_features.detach()
                 cropped_dino_features = _norm(cropped_dino_features)
 
                 cropped_dino_features = self.dropout1d(cropped_dino_features.swapaxes(-2, -1)).swapaxes(-2, -1)
@@ -155,8 +159,8 @@ class SemanticHead(nn.Module):
 
             # Just in training: update knn buffer
             if self.training:
-                new_idx = self._update_buffer(self.dino_patch_buffer, cropped_dino_features)
-                assert new_idx == self._update_buffer(self.dino_gap_buffer, dino_feature_gap)
+                new_idx = self._update_buffer(self.dino_patch_buffer, cropped_dino_features.detach())
+                assert new_idx == self._update_buffer(self.dino_gap_buffer, dino_feature_gap.detach())
 
                 if new_idx < self.buffer_idx:
                     self.buffer_filled = self.buffer_size
@@ -194,9 +198,11 @@ class SemanticHead(nn.Module):
             data["sample_surface_dino_features"] = torch.Tensor([0.0])
 
 
-        # IMPORTANT, train heads after detaching features!
-        dino_features = dino_features.detach()
-        stego_features = stego_features.detach()
+        # By default downstream training treats the feature model as fixed.
+        # VGGT-Omega LoRA fine-tuning keeps this path differentiable.
+        if detach_features:
+            dino_features = dino_features.detach()
+            stego_features = stego_features.detach()
 
         direct_cluster_result = self.direct_cluster_head(dino_features)
         stego_cluster_result = self.stego_cluster_head(stego_features)

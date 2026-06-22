@@ -28,3 +28,72 @@ def main(config: DictConfig):
 
 if __name__ == "__main__":
     main()
+
+
+
+# CUDA_VISIBLE_DEVICES=1 python eval.py \
+#   -cn evaluate_semantic_kitti_360 \
+#   dataset.is_preprocessed=false \
+#   checkpoint=out/features-paper/scenedino-vggt-omega-kitti-360-sscbench-lora-exp-002/training_checkpoint_400000.pt
+
+
+# 6_21
+# CUDA_VISIBLE_DEVICES=2 python eval.py \
+#   -cn evaluate_semantic_kitti_360 \
+#   dataset.is_preprocessed=false \
+#   'checkpoint="out/features-paper/scenedino-vggt-omega-kitti-360-sscbench-lora-exp-002-test/dino_cos_sim_best_model_2_dino_cos_sim=0.9992.pt"'
+
+# /mnt/sdc/wy/code/scenedino_1/out/features-paper/scenedino-vggt-omega-kitti-360-sscbench-lora-exp-002-test/dino_cos_sim_best_model_2_dino_cos_sim=0.9992.pt
+
+
+
+# 评估vggt-omega 完整训练版本
+# /mnt/sdc/wy/code/scenedino_1/out/ssc-paper/semantic-vggt-omega-kitti-360-sscbench-lora-exp-002-test/stego_cluster_weighted_miou_best_model_1_stego_cluster_weighted_miou=0.0217.pt
+
+# CUDA_VISIBLE_DEVICES=2 python eval.py \
+#   -cn evaluate_semantic_kitti_360 \
+#   dataset.is_preprocessed=false \
+#   'checkpoint="out/ssc-paper/semantic-vggt-omega-kitti-360-sscbench-lora-exp-002-test/stego_cluster_weighted_miou_best_model_1_stego_cluster_weighted_miou=0.0217.pt"'
+
+
+# 评估ss_bench 完整训练版本
+# /mnt/sdc/wy/code/scenedino_1/out/ssc-paper/ssc-kitti-360-sscbench/stego_cluster_weighted_miou_best_model_1_stego_cluster_weighted_miou=0.3550.pt
+
+# CUDA_VISIBLE_DEVICES=2 python eval.py \
+#   -cn evaluate_semantic_kitti_360 \
+#   dataset.is_preprocessed=false \
+#   'checkpoint="out/ssc-paper/ssc-kitti-360-sscbench/stego_cluster_weighted_miou_best_model_1_stego_cluster_weighted_miou=0.3550.pt"'
+
+
+# 评估官方checkpoint_best_dino
+
+# CUDA_VISIBLE_DEVICES=2 python eval.py \
+#   -cn evaluate_semantic_kitti_360 \
+#   dataset.is_preprocessed=false \
+#   'checkpoint="out/scenedino-pretrained/seg-best-dino/checkpoint.pt"'
+
+
+# 评估10000pt
+# /mnt/sdc/wy/code/scenedino_1/out/features-paper/scenedino-vggt-omega-kitti-360-sscbench-lora-exp-002-test-1/training_checkpoint_10000_save.pt
+
+# CUDA_VISIBLE_DEVICES=2 python eval.py \
+#   -cn evaluate_semantic_kitti_360 \
+#   dataset.is_preprocessed=false \
+#   'checkpoint="out/features-paper/scenedino-vggt-omega-kitti-360-sscbench-lora-exp-002-test-1/training_checkpoint_10000_save.pt"'
+
+
+
+#  CUDA_VISIBLE_DEVICES=2 python eval.py \
+#   -cn evaluate_semantic_kitti_360 \
+#   dataset.is_preprocessed=false \
+#   'checkpoint="out/features-paper/scenedino-vggt-omega-kitti-360-sscbench-lora-exp-002-test-1/training_checkpoint_20000.pt"'
+
+
+
+
+# /mnt/sdc/wy/code/scenedino_1/out/ssc-paper/semantic-vggt-omega-kitti-360-sscbench-lora-exp-002-test_6_22/stego_cluster_weighted_miou_best_model_16_stego_cluster_weighted_miou=0.0907.pt
+
+#  CUDA_VISIBLE_DEVICES=2 python eval.py \
+#   -cn evaluate_semantic_kitti_360 \
+#   dataset.is_preprocessed=false \
+#   'checkpoint="out/ssc-paper/semantic-vggt-omega-kitti-360-sscbench-lora-exp-002-test_6_22/stego_cluster_weighted_miou_best_model_16_stego_cluster_weighted_miou=0.0907.pt"'

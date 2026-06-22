@@ -27,18 +27,50 @@ logger = logging.getLogger("training")
 
 class BTSDownstreamWrapper(BTSWrapper):
     def __init__(
-        self, renderer: NeRFRenderer, ray_sampler: RaySampler, config, eval_nvs=False, dino_channels=None
+        self,
+        renderer: NeRFRenderer,
+        ray_sampler: RaySampler,
+        config,
+        eval_nvs=False,
+        dino_channels=None,
+        train_vggt_lora=False,
+        vggt_lora_lr_factor=1.0,
     ) -> None:
         super().__init__(renderer, ray_sampler, config, eval_nvs, dino_channels)
+        self.train_vggt_lora = train_vggt_lora
+        self.vggt_lora_lr_factor = vggt_lora_lr_factor
+
         for param in super().parameters(True):
             param.requires_grad_(False)
         for param in renderer.net.downstream_head.parameters(True):
             param.requires_grad_(True)
 
+        if self.train_vggt_lora:
+            self._enable_vggt_lora_training()
+
         self.sample_radius_3d = config.get("sample_radius_3d", 0.5)
 
+    def _enable_vggt_lora_training(self):
+        encoder = getattr(self.renderer.net, "encoder", None)
+        if encoder is None or not getattr(encoder, "lora_enabled", False):
+            logger.warning("training.train_vggt_lora is enabled, but the encoder has no active LoRA modules")
+            return
+
+        trainable = 0
+        for name, param in encoder.named_parameters():
+            if "lora_A" in name or "lora_B" in name:
+                param.requires_grad_(True)
+                trainable += param.numel()
+
+        logger.info(f"Enabled VGGT-Omega LoRA training in downstream stage: {trainable} parameters")
+
+    def _feature_context(self):
+        if self.train_vggt_lora and self.renderer.net.downstream_head.training:
+            return torch.enable_grad()
+        return torch.no_grad()
+
     def forward(self, data):
-        with torch.no_grad():
+        with self._feature_context():
             # TODO: CLEAN THIS UP
             if self.renderer.net.downstream_head.training and len(data["imgs"]) > 1 and torch.rand(1).item() < 0.5:
                 # side view
@@ -66,7 +98,11 @@ class BTSDownstreamWrapper(BTSWrapper):
                     ]
                     #_data_coarse["vis_batch_dino_features_kmeans"] = dino_module.fit_transform_kmeans_visualization(_data_coarse["dino_features"])
 
-        data = self.renderer.net.downstream_head.forward_training(data, visualize=not self.training and hasattr(self, "validation_tag") and self.validation_tag == "visualization_seg")
+        data = self.renderer.net.downstream_head.forward_training(
+            data,
+            visualize=not self.training and hasattr(self, "validation_tag") and self.validation_tag == "visualization_seg",
+            detach_features=not (self.train_vggt_lora and self.renderer.net.downstream_head.training),
+        )
         return data
 
     def forward_downstream(self, data, id_encoder):
@@ -299,7 +335,18 @@ class BTSDownstreamWrapper(BTSWrapper):
         return self.renderer.net.downstream_head.parameters(recurse)
     
     def parameters_lr(self):
-        return self.renderer.net.downstream_head.parameters_lr()
+        groups = list(self.renderer.net.downstream_head.parameters_lr())
+        if self.train_vggt_lora:
+            encoder = getattr(self.renderer.net, "encoder", None)
+            if encoder is not None:
+                lora_params = [
+                    param
+                    for name, param in encoder.named_parameters()
+                    if param.requires_grad and ("lora_A" in name or "lora_B" in name)
+                ]
+                if lora_params:
+                    groups.append((self.vggt_lora_lr_factor, lora_params))
+        return groups
 
     def update_model_eval(self, metrics):
         self.renderer.net.downstream_head.update_model_eval(metrics)
@@ -342,7 +389,14 @@ def initialize(config: dict):
 
     ray_sampler = get_ray_sampler(config["training"]["ray_sampler"])
 
-    model = BTSDownstreamWrapper(renderer, ray_sampler, config["model"], mode == "nvs")
+    model = BTSDownstreamWrapper(
+        renderer,
+        ray_sampler,
+        config["model"],
+        mode == "nvs",
+        train_vggt_lora=config["training"].get("train_vggt_lora", False),
+        vggt_lora_lr_factor=config["training"].get("vggt_lora_lr_factor", 1.0),
+    )
     model = idist.auto_model(model)
 
     # TODO: make optimizer itself configurable configurable

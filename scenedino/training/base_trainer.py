@@ -341,7 +341,7 @@ def create_trainer(
         with_pbars=False,
         clear_cuda_cache=False,
         log_every_iters=config.get("log_every_iters", 100),
-        n_saved=1,
+        n_saved=None,
     )
 
     if idist.get_rank() == 0:

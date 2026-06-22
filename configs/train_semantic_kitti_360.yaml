@@ -37,7 +37,7 @@ output:
 
 training:
   epoch_length: 1000
-  resume_from: "<PATH-FEATURE-CHECKPOINT>.pt"
+  resume_from: "/mnt/sdc/wy/code/scenedino_1/out/features-paper/scenedino-kitti-360-sscbench/dino_cos_sim_best_model_46_dino_cos_sim=0.5945.pt"
 
   optimizer:
     args:

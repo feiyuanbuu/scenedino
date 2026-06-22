@@ -22,6 +22,24 @@ from scenedino.visualization.vis_2d import tb_visualize
 from .wrapper import make_eval_fn
 
 
+def _filter_explicit_vggt_lora_state_dict(state_dict, config, logger):
+    if config.get("_vggt_lora_checkpoint_source", None) != "explicit":
+        return state_dict
+
+    filtered_state_dict = {
+        key: value
+        for key, value in state_dict.items()
+        if "lora_A" not in key and "lora_B" not in key
+    }
+    skipped = len(state_dict) - len(filtered_state_dict)
+    if skipped > 0:
+        logger.info(
+            "Keeping explicitly loaded VGGT-Omega LoRA adapter; "
+            f"skipped {skipped} LoRA tensors from the model checkpoint"
+        )
+    return filtered_state_dict
+
+
 def base_evaluation(
     local_rank,
     config,
@@ -80,9 +98,11 @@ def base_evaluation(
         checkpoint = torch.load(cp_path, map_location=device)
         logger.info(f"Loading checkpoint from path: {cp_path}")
         if "model" in checkpoint:
-            model.load_state_dict(checkpoint["model"], strict=False)
+            state_dict = checkpoint["model"]
         else:
-            model.load_state_dict(checkpoint, strict=False)
+            state_dict = checkpoint
+        state_dict = _filter_explicit_vggt_lora_state_dict(state_dict, config, logger)
+        model.load_state_dict(state_dict, strict=False)
     else:
         logger.warning("Careful, no model is loaded")
     model.to(device)
