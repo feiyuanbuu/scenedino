@@ -52,6 +52,14 @@ def _make_optimizer_param_groups(model: nn.Module, config: dict):
         encoder_optim_args = base_optim_args.copy()
         encoder_optim_args["lr"] = encoder_optim_args["lr"] / 10
         special_modules.append(("renderer.net.encoder.encoder.", encoder.encoder, encoder_optim_args))
+    if hasattr(encoder, "dino"):
+        dino = encoder.dino
+        if hasattr(dino, "decoder"):
+            special_modules.append(("renderer.net.encoder.dino.decoder.", dino.decoder, base_optim_args.copy()))
+        if hasattr(dino, "encoder"):
+            encoder_optim_args = base_optim_args.copy()
+            encoder_optim_args["lr"] = encoder_optim_args["lr"] / 10
+            special_modules.append(("renderer.net.encoder.dino.encoder.", dino.encoder, encoder_optim_args))
 
     special_prefixes = tuple(prefix for prefix, _, _ in special_modules)
     param_groups = [

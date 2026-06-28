@@ -1,0 +1,53 @@
+defaults:
+  - dataset: kitti_360_sscbench
+  - model: vggt_omega_adapter
+  - renderer: pixelnerf
+  - training: scenedino
+  - validation: scenedino
+  - _self_
+
+training_type: "full_training"
+mode: "nvs"
+seed: 0
+backend: null
+nproc_per_node: null
+with_amp: true
+name: "training"
+batch_size: 1
+num_workers: 4
+
+output:
+  path: "out/features-paper"
+  unique_id: scenedino-vggt-omega-kitti-360-sscbench-no-lora-restored
+
+renderer:
+  n_coarse: 32
+  n_fine: 0
+  n_fine_depth: 0
+  depth_std: 1.0
+  sched: []
+  white_bkgd: false
+  lindisp: true
+  hard_alpha_cap: true
+  render_mode: volumetric
+  eval_batch_size: 65536
+  normalize_dino: true
+
+model:
+  # Restore the original VGGT-Omega first-stage config without LoRA.
+  encoder:
+    lora:
+      enabled: false
+
+training:
+  auto_model: true
+  from_pretrained: null
+  checkpoint_every: 10000
+
+  ray_sampler:
+    args:
+      patch_size: 16
+      ray_batch_size: 1024
+
+  scheduler:
+    step_size: 50000

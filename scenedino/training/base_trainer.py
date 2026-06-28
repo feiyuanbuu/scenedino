@@ -57,6 +57,14 @@ def _named_parameters_all(model):
     )
 
 
+def _collect_scalar_parameters(model, names: tuple[str, ...]):
+    return {
+        name: param.detach().float().cpu().item()
+        for name, param in _named_parameters_all(model)
+        if name.endswith(names) and param.numel() == 1
+    }
+
+
 def _get_vggt_lora_encoder(model):
     model = _unwrap_model(model)
     if not hasattr(model, "renderer"):
@@ -312,7 +320,10 @@ def create_trainer(
             "output": data,
             "loss_dict": loss_metrics,
             "timings_dict": timing,
-            "metrics_dict": {},
+            "metrics_dict": {
+                f"params/{name}": value
+                for name, value in _collect_scalar_parameters(model, ("depth_alpha",)).items()
+            },
         }
 
     trainer = Engine(train_step)
@@ -341,7 +352,7 @@ def create_trainer(
         with_pbars=False,
         clear_cuda_cache=False,
         log_every_iters=config.get("log_every_iters", 100),
-        n_saved=None,
+        n_saved=1,
     )
 
     if idist.get_rank() == 0:

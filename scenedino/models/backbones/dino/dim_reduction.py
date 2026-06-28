@@ -3,6 +3,11 @@ from torch import nn
 import torch.nn.functional as F
 
 
+def _safe_normalize(features, dim=-1, eps=1e-6):
+    normalized = F.normalize(features.float(), dim=dim, eps=eps)
+    return normalized.to(dtype=features.dtype)
+
+
 class NoDimReduction(nn.Module):
     def __init__(self, full_channels, reduced_channels):
         super().__init__()
@@ -22,7 +27,7 @@ class MlpDimReduction(nn.Module):
     def transform_expand(self, features):
         latent = self.relu(self.linear_in(features))
         output = self.linear_out(latent)
-        return F.normalize(output, dim=-1)
+        return _safe_normalize(output, dim=-1)
 
 
 class OrthogonalLinearDimReduction(nn.Module):
@@ -33,4 +38,4 @@ class OrthogonalLinearDimReduction(nn.Module):
 
     def transform_expand(self, features):
         output = features @ self.weights.transpose(0, 1) + self.bias
-        return F.normalize(output, dim=-1)
+        return _safe_normalize(output, dim=-1)

@@ -11,5 +11,5 @@
   regularizations:
     - type: edge_aware_smoothness
       lambda: 0.001
-    - type: dino_edge_aware_smoothness
-      lambda: 0.25
+    # - type: dino_edge_aware_smoothness
+    #   lambda: 0.25

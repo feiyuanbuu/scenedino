@@ -3,7 +3,7 @@ import torch
 from collections.abc import Mapping, Sequence
 
 # ckpt_path = "/mnt/sdc/wy/code/scenedino_1/out/features-paper/scenedino-vggt-omega-kitti-360-sscbench-lora-exp-002-test/training_checkpoint_200000.pt"
-ckpt_path = "/mnt/sdc/wy/code/scenedino_1/out/ssc-paper/semantic-vggt-omega-kitti-360-sscbench-lora-exp-002-test_6_22/stego_cluster_weighted_miou_best_model_16_stego_cluster_weighted_miou=0.0907.pt"
+# ckpt_path = "/mnt/sdc/wy/code/scenedino_1/out/ssc-paper/semantic-vggt-omega-kitti-360-sscbench-lora-exp-002-test_6_22/stego_cluster_weighted_miou_best_model_16_stego_cluster_weighted_miou=0.0907.pt"
 
 
 def print_keys(obj, prefix=""):

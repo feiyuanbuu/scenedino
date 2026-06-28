@@ -1,0 +1,69 @@
+arch: "BTSNet"
+use_code: true
+prediction_mode: default
+
+predict_dino: true
+dino_dims: 64
+
+compensate_artifacts: true
+flip_augmentation: true
+
+encoder:
+  type: "dino_da"
+  dino:
+    mode: "downsample-prediction"
+    decoder_arch: "dpt"
+    downsampler_arch: "featup"
+    encoder_arch: "vit-b"
+    version: "v1"
+    separate_gt_version: "v1"
+    encoder_freeze: false
+    flip_avg_gt: false
+    dim_reduction_arch: "mlp"
+    num_ch_enc: [64, 64, 128, 256]
+    intermediate_features: [3, 6, 9]
+    decoder_out_dim: 256
+    dino_pca_dim: 64
+    image_size: [192, 640]
+    key_features: false
+  depth_anything:
+    repo_path: "/mnt/sdc/wy/code/Depth-Anything-V2"
+    checkpoint_path: "/mnt/sdc/wy/code/Depth-Anything-V2/checkpoints/depth_anything_v2_vitl.pth"
+    encoder: "vitl"
+    input_size: [196, 644]
+    normalize_depth: true
+    use_log_depth: true
+
+code:
+  num_freqs: 6
+  freq_factor: 1.5
+  include_input: true
+
+decoder_heads:
+  - type: "resnet"
+    name: "normal_head"
+    freeze: false
+    args:
+      n_blocks: 0
+      d_hidden: 128
+final_prediction_head: "normal_head"
+
+encoding_strategy:
+  name: "default"
+  args: {}
+eval_encoding_strategy:
+  name: "default"
+  args: null
+loss_renderer_strategy:
+  name: "kitti_360"
+  args: null
+eval_loss_renderer_strategy:
+  name: "single_renderer"
+  args:
+    shuffle_frames: false
+    all_frames: true
+
+inv_z: true
+learn_empty: false
+code_mode: z
+n_frames_render: 4

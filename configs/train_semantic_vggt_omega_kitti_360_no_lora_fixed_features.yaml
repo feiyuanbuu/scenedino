@@ -19,12 +19,12 @@ gradient_accum_factor: 1
 num_workers: 4
 
 renderer:
-  n_coarse : 32
-  n_fine : 0
-  n_fine_depth : 0
-  depth_std : 1.0
-  sched : []
-  white_bkgd : false
+  n_coarse: 32
+  n_fine: 0
+  n_fine_depth: 0
+  depth_std: 1.0
+  sched: []
+  white_bkgd: false
   lindisp: true
   hard_alpha_cap: true
   render_mode: volumetric
@@ -33,24 +33,28 @@ renderer:
 
 output:
   path: "out/ssc-paper"
-  unique_id: semantic-vggt-omega-kitti-360-sscbench-lora-exp-002-test_6_22
+  unique_id: semantic-vggt-omega-kitti-360-sscbench-no-lora-fixed-features
+
+model:
+  sample_radius_3d: 0.5
+  # Match the first-stage no-LoRA VGGT-Omega checkpoint structure.
+  encoder:
+    lora:
+      enabled: false
 
 training:
   epoch_length: 1000
   resume_from: null
-  from_pretrained: "/mnt/sdc/wy/code/scenedino_1/out/features-paper/scenedino-vggt-omega-kitti-360-sscbench-lora-exp-002-test/dino_cos_sim_best_model_2_dino_cos_sim=0.9992.pt"
+  from_pretrained: "/mnt/sdc/wy/code/scenedino_1/out/features-paper/scenedino-vggt-omega-kitti-360-sscbench/dino_cos_sim_best_model_4_dino_cos_sim=0.8917.pt"
 
-  # Load the first-stage VGGT-Omega + LoRA + SceneDINO checkpoint as fixed
-  # features, then train only the semantic downstream head.
+  # Fixed-feature downstream training: keep the loaded VGGT-Omega and SceneDINO
+  # parameters frozen, and train only the semantic downstream head.
   train_vggt_lora: false
   vggt_lora_lr_factor: 1.0
 
   optimizer:
     args:
-      lr: 1e-4
-
-model:
-  sample_radius_3d: 0.5
+      lr: 5e-4
 
 downstream:
   input_dim: 256

@@ -1,6 +1,6 @@
 defaults:
   - dataset: kitti_360_sscbench
-  - model: dino_downsampler
+  - model: dino_da_adapter
   - renderer: pixelnerf
   - training: semantic
   - validation: semantic
@@ -12,41 +12,41 @@ mode: "nvs"
 seed: 0
 backend: null
 nproc_per_node: null
-with_amp: false
+with_amp: true
 name: "training"
 batch_size: 1
 gradient_accum_factor: 1
 num_workers: 6
 
 renderer:
-  n_coarse : 32
-  n_fine : 0
-  n_fine_depth : 0
-  depth_std : 1.0
-  sched : []
-  white_bkgd : false
+  n_coarse: 32
+  n_fine: 0
+  n_fine_depth: 0
+  depth_std: 1.0
+  sched: []
+  white_bkgd: false
   lindisp: true
   hard_alpha_cap: true
   render_mode: volumetric
   eval_batch_size: 65536
   normalize_dino: true
 
-eval_visualize: [0, 1, 2, 3]
-
 output:
-  path: "out/evaluation-paper"
-  unique_id: evaluation-kitti-360-sscbench-vggt-omega-no-lora
+  path: "out/ssc-paper"
+  unique_id: semantic-dino-da-kitti-360-sscbench-2026-6-28-17-03
 
-checkpoint: "<PATH-FEATURE-CHECKPOINT>.pt"
-vggt_lora_checkpoint: null
-auto_downstream_input_dim: true
+training:
+  epoch_length: 1000
+  resume_from: "/mnt/sdc/wy/code/scenedino_1/dino_cos_sim_best_model_1_dino_cos_sim=0.5609.pt"
 
-evaluations:
-  - type: seg
-    agg_type: unsup_seg
+  optimizer:
     args:
-      n_classes: 19
-      gt_classes: 19
+      lr: 5e-4
+
+model:
+  sample_radius_3d: 0.5
 
 downstream:
   input_dim: 768
+  mode: "3d"
+  # mlp_head: true

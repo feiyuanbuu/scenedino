@@ -97,3 +97,25 @@ if __name__ == "__main__":
 #   -cn evaluate_semantic_kitti_360 \
 #   dataset.is_preprocessed=false \
 #   'checkpoint="out/ssc-paper/semantic-vggt-omega-kitti-360-sscbench-lora-exp-002-test_6_22/stego_cluster_weighted_miou_best_model_16_stego_cluster_weighted_miou=0.0907.pt"'
+
+
+
+
+
+
+
+
+# 6_24评估
+# /mnt/sdc/wy/code/scenedino_1/out/ssc-paper/semantic-vggt-omega-kitti-360-sscbench-no-lora-fixed-features/stego_cluster_weighted_miou_best_model_1_stego_cluster_weighted_miou=0.0217.pt
+
+#  CUDA_VISIBLE_DEVICES=2 python eval.py \
+#   -cn evaluate_semantic_kitti_360 \
+#   dataset.is_preprocessed=false \
+#   'checkpoint="out/ssc-paper/semantic-vggt-omega-kitti-360-sscbench-no-lora-fixed-features/stego_cluster_weighted_miou_best_model_1_stego_cluster_weighted_miou=0.0217.pt"'
+
+
+
+# 6_28评估
+# cd /mnt/sdc/wy/code/scenedino_1
+# CUDA_VISIBLE_DEVICES=2 /home/wy/anaconda3/envs/scenedino/bin/python eval.py \
+#   -cn evaluate_semantic_dino_da_kitti_360

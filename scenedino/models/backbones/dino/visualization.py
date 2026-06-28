@@ -44,6 +44,7 @@ class VisualizationModule(nn.Module):
             data_pca (Tensor): Transformed low-dimensional data of the shape [N, num_components] or [B, N, num_components].
             pca_components (Tensor): Principal components of the shape [num_components, C] or [B, num_components, C].
         """
+        data = data.float()
         # Normalize data
         data_mean = data.mean(dim=-2, keepdim=True)
         data_normalize = (data - data_mean) / (data.std(dim=-2, keepdim=True) + 1e-08)

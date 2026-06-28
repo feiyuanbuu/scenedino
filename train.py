@@ -80,7 +80,10 @@ if __name__ == "__main__":
 
 
 
+# freeze 网络
+# /mnt/sdc/wy/code/scenedino_1/configs/train_scenedino_vggt_omega_kitti_360_no_lora_restored.yaml
 
+# CUDA_VISIBLE_DEVICES=1 python train.py -cn train_scenedino_vggt_omega_kitti_360_no_lora_restored dataset.is_preprocessed=false
 
 
 
@@ -101,3 +104,18 @@ if __name__ == "__main__":
 #   -cn train_semantic_vggt_omega_kitti_360 \
 #   dataset.is_preprocessed=false
 
+
+# 6_24 freeze网络
+# CUDA_VISIBLE_DEVICES=1 python train.py \
+#   -cn train_semantic_vggt_omega_kitti_360_no_lora_fixed_features \
+#   dataset.is_preprocessed=false
+
+
+
+
+# 6_27 da第一阶段
+# CUDA_VISIBLE_DEVICES=1 python train.py   -cn train_scenedino_dino_da_kitti_360   dataset.is_preprocessed=false
+
+
+# 6_27 da 第二阶段
+# CUDA_VISIBLE_DEVICES=2 python train.py -cn train_semantic_dino_da_kitti_360 dataset.is_preprocessed=false

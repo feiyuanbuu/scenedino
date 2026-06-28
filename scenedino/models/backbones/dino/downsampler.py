@@ -90,7 +90,8 @@ class PatchSalienceDownsampler(torch.nn.Module):
 
         patched_features = torch.sum(weight_map * x, dim=(2, 3))
         if self.normalize_features:
-            patched_features = patched_features / torch.linalg.norm(patched_features, dim=-1, keepdim=True)
+            norm = torch.linalg.norm(patched_features.float(), dim=-1, keepdim=True).clamp_min(1e-6)
+            patched_features = (patched_features.float() / norm).to(dtype=patched_features.dtype)
 
         return (patched_features,
                 salience_map.reshape(n, p, patch_h, patch_w, 1, 1),
