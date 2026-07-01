@@ -115,7 +115,13 @@ if __name__ == "__main__":
 
 
 
-# 6_28评估
+# 6_28评估 da depth 相加
 # cd /mnt/sdc/wy/code/scenedino_1
 # CUDA_VISIBLE_DEVICES=2 /home/wy/anaconda3/envs/scenedino/bin/python eval.py \
 #   -cn evaluate_semantic_dino_da_kitti_360
+
+
+# 6_29评估 da depth prior
+# cd /mnt/sdc/wy/code/scenedino_1
+# CUDA_VISIBLE_DEVICES=2 python eval.py \
+#   -cn evaluate_semantic_dino_da_depth_prior_kitti_360

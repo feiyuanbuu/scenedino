@@ -81,11 +81,11 @@ class FrozenDepthAnythingV2(nn.Module):
 
 
 class DINOAndDepthAnythingAdapter(nn.Module):
-    """SceneDINO DINO features with a zero-initialized Depth-Anything residual.
+    """SceneDINO DINO features with a frozen Depth-Anything depth prior.
 
     - ground_truth=True returns frozen DINO features used as the reconstruction target.
-    - ground_truth=False returns the original SceneDINO DINO decoder features plus
-      a learnable residual projected from frozen Depth-Anything depth.
+    - ground_truth=False returns the original SceneDINO DINO decoder features.
+    - get_depth_prior returns frozen Depth-Anything depth aligned to a target grid.
     """
 
     def __init__(self, dino: dict, depth_anything: dict):
@@ -123,14 +123,10 @@ class DINOAndDepthAnythingAdapter(nn.Module):
         if ground_truth:
             return self.dino(x, ground_truth=True)
 
-        dino_features_ms = self.dino(x, ground_truth=False)
-        fused_features_ms = []
-        for dino_features in dino_features_ms:
-            depth = self.depth_anything(x, target_size=dino_features.shape[-2:])
-            depth_residual = self.depth_proj(depth.to(dtype=dino_features.dtype))
-            depth_residual = torch.nan_to_num(depth_residual, nan=0.0, posinf=0.0, neginf=0.0)
-            fused_features_ms.append(dino_features + self.depth_alpha.to(dino_features.dtype) * depth_residual)
-        return fused_features_ms
+        return self.dino(x, ground_truth=False)
+
+    def get_depth_prior(self, x: torch.Tensor, target_size: tuple[int, int]) -> torch.Tensor:
+        return self.depth_anything(x, target_size=target_size)
 
     def downsample(self, x, mode="patch"):
         return self.dino.downsample(x, mode)

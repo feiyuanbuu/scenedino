@@ -113,9 +113,21 @@ if __name__ == "__main__":
 
 
 
-# 6_27 da第一阶段
+# 6_27 da第一阶段 freeze
 # CUDA_VISIBLE_DEVICES=1 python train.py   -cn train_scenedino_dino_da_kitti_360   dataset.is_preprocessed=false
 
 
-# 6_27 da 第二阶段
+# 6_27 da 第二阶段 
 # CUDA_VISIBLE_DEVICES=2 python train.py -cn train_semantic_dino_da_kitti_360 dataset.is_preprocessed=false
+
+
+
+# 6_28 da 第一阶段 depth 作为prior
+# /mnt/sdc/wy/code/scenedino_1/configs/train_scenedino_dino_da_depth_prior_kitti_360.yaml
+
+# CUDA_VISIBLE_DEVICES=1 python train.py   -cn train_scenedino_dino_da_depth_prior_kitti_360   dataset.is_preprocessed=false
+
+
+
+# 6_29 da 第二阶段 depth 作为prior
+# CUDA_VISIBLE_DEVICES=2 python train.py -cn train_semantic_dino_da_depth_prior_kitti_360 dataset.is_preprocessed=false

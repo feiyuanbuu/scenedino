@@ -30,6 +30,11 @@ def make_model(config, downstream_config=None):
             code_xyz = PositionalEncoding.from_conf(config["code"], d_in=3)
             encoder = make_backbone(config["encoder"])
             d_in = encoder.latent_size + code_xyz.d_out
+            depth_prior_conf = config.get("depth_prior", {})
+            if depth_prior_conf.get("enabled", False):
+                if not hasattr(encoder, "get_depth_prior"):
+                    raise ValueError("depth_prior.enabled=true requires an encoder with get_depth_prior().")
+                d_in += len(depth_prior_conf.get("channels", ["delta", "confidence"]))
 
             split_dino_heads = config.get("split_dino_heads", False)
             if split_dino_heads:

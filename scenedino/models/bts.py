@@ -75,9 +75,30 @@ class BTSNet(BaseModel):
         self.return_sample_depth = conf.get("return_sample_depth", False)
         self.sample_color = conf.get("sample_color", True)
         self.predict_dino = conf.get("predict_dino", False)
+        self.depth_prior_conf = conf.get("depth_prior", {})
+        self.use_depth_prior = self.depth_prior_conf.get("enabled", False)
+        self.depth_prior_channels = self.depth_prior_conf.get("channels", ["delta", "confidence"])
+        self.depth_delta_clip = self.depth_prior_conf.get("delta_clip", 5.0)
+        self.depth_confidence_temperature = self.depth_prior_conf.get("confidence_temperature", 1.0)
+        if self.use_depth_prior:
+            if not hasattr(self.encoder, "get_depth_prior"):
+                raise ValueError("depth_prior.enabled=true requires an encoder with get_depth_prior().")
+            depth_anything = getattr(self.encoder, "depth_anything", None)
+            if depth_anything is not None and (
+                not getattr(depth_anything, "use_log_depth", False)
+                or not getattr(depth_anything, "normalize_depth", False)
+            ):
+                raise ValueError(
+                    "depth_prior expects Depth-Anything use_log_depth=true and normalize_depth=true."
+                )
+            unsupported = set(self.depth_prior_channels) - {"delta", "confidence"}
+            if unsupported:
+                raise ValueError(f"Unsupported depth_prior channels: {sorted(unsupported)}")
 
         # TODO: manage _d_out in another way
         d_in = self.encoder.latent_size + self.code_xyz.d_out  ### 64 + 39
+        if self.use_depth_prior:
+            d_in += len(self.depth_prior_channels)
         if self.sample_color and self.predict_dino:
             dino_dims = conf.get("dino_dims", 16)
             d_out = 1 + dino_dims
@@ -181,6 +202,7 @@ class BTSNet(BaseModel):
             comb_render = None
         ## Note: This is yet to be feature map before passing img to encoder
         n_, nv_, c_, h_, w_ = images_encoder.shape  ### [n_, nv_, 3:=RGB, 192, 640]
+        image_h_, image_w_ = h_, w_
         n_loss_, nv_loss_, _, _, _ = images_loss.shape
 
         if self.flip_augmentation and self.training:  ## data augmentation for color
@@ -255,6 +277,18 @@ class BTSNet(BaseModel):
         self.grid_f_poses_w2c = poses_w2c_encoder
         self.grid_f_combine = comb_encoder
 
+        if self.use_depth_prior:
+            depth_prior = self.encoder.get_depth_prior(
+                images_encoder.view(n_ * nv_, c_, image_h_, image_w_),
+                target_size=image_latents_ms[self._scale].shape[-2:],
+            )
+            depth_prior = depth_prior.view(n_, nv_, 1, *depth_prior.shape[-2:])
+            if do_flip:
+                depth_prior = torch.flip(depth_prior, dims=(-1,))
+            self.grid_d_depth = depth_prior
+        else:
+            self.grid_d_depth = None
+
         ## color
         self.grid_c_imgs = images_render.detach()
         self.grid_c_Ks = Ks_render
@@ -315,6 +349,18 @@ class BTSNet(BaseModel):
             .permute(0, 1, 3, 2)
         )  ## set x,y coordinates as grid feature
 
+        if self.use_depth_prior:
+            depth_features = self.sample_depth_prior(
+                xy,
+                z,
+                invalid,
+                B,
+                n_views,
+                n_pts,
+            )
+        else:
+            depth_features = None
+
         if self.learn_empty:
             ## "empty space" can refer to areas in a scene where there is no object, or it could also refer to areas that are not observed or are beyond the range of the sensor. This allows the model to have a distinct learned representation for "empty" space, which can be beneficial in tasks like 3D reconstruction where understanding both the objects in a scene and the empty space between them is important.
             ## Replace invalid features in the sampled features tensor with the corresponding features from the expanded empty feature
@@ -325,14 +371,56 @@ class BTSNet(BaseModel):
                 invalid.expand(-1, -1, -1, c_)
             ]  ## broadcasting and make it fit to feature map
 
-        sampled_features = torch.cat(
-            (sampled_features, xyz_code), dim=-1
-        )  # [B, n_views, n_pts, C+C_pos_emb]
+        features_to_concat = [sampled_features, xyz_code]
+        if depth_features is not None:
+            features_to_concat.append(depth_features)
+        sampled_features = torch.cat(features_to_concat, dim=-1)  # [B, n_views, n_pts, C+C_pos_emb(+depth)]
 
         return (
             sampled_features.permute(0, 2, 1, 3),
             invalid[..., 0].permute(0, 2, 1),
         )
+
+    def sample_depth_prior(self, xy, z, invalid, B, n_views, n_pts):
+        _, _, _, h_, w_ = self.grid_d_depth.shape
+        sampled_depth = (
+            F.grid_sample(
+                self.grid_d_depth.view(B * n_views, 1, h_, w_),
+                xy.view(B * n_views, 1, -1, 2),
+                mode="bilinear",
+                padding_mode="border",
+                align_corners=False,
+            )
+            .view(B, n_views, 1, n_pts)
+            .permute(0, 1, 3, 2)
+        )
+
+        valid = ~invalid[..., 0]
+        log_z = torch.log(z[..., 0].clamp_min(EPS))
+        log_z = torch.nan_to_num(log_z, nan=0.0, posinf=0.0, neginf=0.0)
+        valid_f = valid.to(log_z.dtype)
+        valid_count = valid_f.sum(dim=-1, keepdim=True)
+        has_valid = valid_count > 0
+        safe_count = valid_count.clamp_min(1.0)
+        mean = (log_z * valid_f).sum(dim=-1, keepdim=True) / safe_count
+        centered = torch.where(valid, log_z - mean, torch.zeros_like(log_z))
+        variance = (centered.square() * valid_f).sum(dim=-1, keepdim=True) / safe_count
+        std = torch.sqrt(variance).clamp_min(1e-6)
+        log_z_norm = torch.where(has_valid, centered / std, torch.zeros_like(centered))
+
+        depth_delta = log_z_norm.unsqueeze(-1) - sampled_depth.to(log_z_norm.dtype)
+        depth_delta = depth_delta.clamp(-self.depth_delta_clip, self.depth_delta_clip)
+        confidence_temperature = max(float(self.depth_confidence_temperature), 1e-6)
+        depth_confidence = torch.exp(-depth_delta.abs() / confidence_temperature)
+
+        depth_delta = torch.where(valid.unsqueeze(-1), depth_delta, torch.zeros_like(depth_delta))
+        depth_confidence = torch.where(valid.unsqueeze(-1), depth_confidence, torch.zeros_like(depth_confidence))
+
+        channel_values = {
+            "delta": depth_delta,
+            "confidence": depth_confidence,
+        }
+        return torch.cat([channel_values[channel] for channel in self.depth_prior_channels], dim=-1)
 
     def sample_colors(self, xyz, **kwargs):
         n_, n_pts, _ = xyz.shape  ## n := batch size, n_pts := #_points in world coord.

@@ -3,7 +3,7 @@ defaults:
   - loss: semantic
   - _self_
 
-num_epochs: 1
+num_epochs: 5
 epoch_length: 2500
 continue: false
 
